@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import useStore from '../store/todoStore';
 
 const Sidebar = ({ setActiveTab }) => {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [userData, setUserData] = useState(null);
   const location = useLocation();
+  const todos = useStore(state => state.todos);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -36,11 +38,20 @@ const Sidebar = ({ setActiveTab }) => {
     }
   };
 
+  // Get today's date in YYYY-MM-DD format
+  const today = new Date().toISOString().split('T')[0];
+  
+  // Calculate counts
+  const todaysTasksCount = todos.filter(todo => todo.date === today).length;
+  const importantTasksCount = todos.filter(todo => todo.isImportant).length;
+  const upcomingTasksCount = todos.filter(todo => todo.date > today).length;
+  const allTasksCount = todos.length;
+
   const tasks = [
-    { name: 'All Tasks', onClick: () => setActiveTab('all'), icon: '📋' },
-    { name: 'Today', count: 5, href: '/today', icon: '📅' },
-    { name: 'Important', count: 3, href: '/important', icon: '⭐' },
-    { name: 'Upcoming', count: 8, href: '/upcoming', icon: '📆' },
+    { name: 'All Tasks', onClick: () => setActiveTab('all'), icon: '📋', count: allTasksCount },
+    { name: 'Today', onClick: () => setActiveTab('today'), icon: '📅', count: todaysTasksCount },
+    { name: 'Important', onClick: () => setActiveTab('important'), icon: '⭐', count: importantTasksCount },
+    { name: 'Upcoming', onClick: () => setActiveTab('upcoming'), icon: '📆', count: upcomingTasksCount },
   ];
 
   const lists = [
