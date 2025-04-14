@@ -1,16 +1,40 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import useStore from '../../store/todoStore'
+import { auth } from '../../firebase/config'
 
 const AllTasks = () => {
   const [filter, setFilter] = useState('all') // all, pending, completed
   const [editingTask, setEditingTask] = useState(null)
+  const [selectedTasks, setSelectedTasks] = useState(new Set())
   const todos = useStore(state => state.todos)
   const categories = useStore(state => state.categories)
   const toggleTodo = useStore(state => state.toggleTodo)
   const updateTodo = useStore(state => state.updateTodo)
+  const deleteTodo = useStore(state => state.deleteTodo)
+
+  // Filter tasks for current user
+  const userTasks = todos.filter(task => {
+    // Get the numeric user ID for API tasks
+    const getDummyUserId = (firebaseUid) => {
+      const hash = firebaseUid.split('').reduce((acc, char) => {
+        return char.charCodeAt(0) + ((acc << 5) - acc);
+      }, 0);
+      return Math.abs(hash % 100) + 1;
+    };
+
+    if (!auth.currentUser) return false;
+
+    if (task.id <= 150) {
+      // API tasks - compare with mapped numeric ID
+      return task.userId === getDummyUserId(auth.currentUser.uid);
+    } else {
+      // Local tasks - compare with Firebase UID
+      return task.userId === auth.currentUser.uid;
+    }
+  });
 
   // Apply status filter
-  const filteredTasks = todos.filter(task => {
+  const filteredTasks = userTasks.filter(task => {
     if (filter === 'pending') return !task.completed
     if (filter === 'completed') return task.completed
     return true
@@ -66,49 +90,100 @@ const AllTasks = () => {
     setEditingTask(null)
   }
 
+  const handleSelectAll = () => {
+    if (selectedTasks.size === sortedTasks.length) {
+      // If all tasks are selected, unselect all
+      setSelectedTasks(new Set())
+    } else {
+      // Select all tasks
+      setSelectedTasks(new Set(sortedTasks.map(task => task.id)))
+    }
+  }
+
+  const handleSelectTask = (taskId) => {
+    const newSelected = new Set(selectedTasks)
+    if (newSelected.has(taskId)) {
+      newSelected.delete(taskId)
+    } else {
+      newSelected.add(taskId)
+    }
+    setSelectedTasks(newSelected)
+  }
+
+  const handleDeleteSelected = async () => {
+    if (window.confirm(`Are you sure you want to delete ${selectedTasks.size} tasks?`)) {
+      for (const taskId of selectedTasks) {
+        await deleteTodo(taskId)
+      }
+      setSelectedTasks(new Set())
+    }
+  }
+
   return (
     <div className="mt-8">
-      {/* Filter Buttons */}
-      <div className="flex gap-2 mb-6">
-        <button
-          onClick={() => setFilter('all')}
-          className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 
-            ${filter === 'all' 
-              ? 'bg-[#1a1a1a] text-white' 
-              : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-        >
-          All Tasks
-        </button>
-        <button
-          onClick={() => setFilter('pending')}
-          className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 
-            ${filter === 'pending' 
-              ? 'bg-[#1a1a1a] text-white' 
-              : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-        >
-          Pending
-        </button>
-        <button
-          onClick={() => setFilter('completed')}
-          className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 
-            ${filter === 'completed' 
-              ? 'bg-[#1a1a1a] text-white' 
-              : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-        >
-          Completed
-        </button>
+      {/* Top Actions Bar */}
+      <div className="flex justify-between items-center mb-6">
+        {/* Filter Buttons */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setFilter('all')}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 
+              ${filter === 'all' 
+                ? 'bg-[#1a1a1a] text-white' 
+                : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+          >
+            All Tasks
+          </button>
+          <button
+            onClick={() => setFilter('pending')}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 
+              ${filter === 'pending' 
+                ? 'bg-[#1a1a1a] text-white' 
+                : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+          >
+            Pending
+          </button>
+          <button
+            onClick={() => setFilter('completed')}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 
+              ${filter === 'completed' 
+                ? 'bg-[#1a1a1a] text-white' 
+                : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+          >
+            Completed
+          </button>
+        </div>
+
+        {/* Bulk Actions */}
+        <div className="flex gap-2">
+          <button
+            onClick={handleSelectAll}
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-white text-gray-600 hover:bg-gray-50 border border-gray-200 transition-colors duration-200"
+          >
+            {selectedTasks.size === sortedTasks.length ? 'Unselect All' : 'Select All'}
+          </button>
+          {selectedTasks.size > 0 && (
+            <button
+              onClick={handleDeleteSelected}
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition-colors duration-200 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete Selected ({selectedTasks.size})
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Tasks List Grouped by Date */}
+      {/* Tasks List */}
       <div className="space-y-8">
         {Object.entries(groupedTasks).map(([date, tasks]) => (
           <div key={date} className="space-y-3">
-            {/* Date Header */}
             <h2 className="text-lg font-semibold text-gray-900">
               {formatDate(date)}
             </h2>
 
-            {/* Tasks for this date */}
             <div className="space-y-3">
               {tasks.map(task => (
                 <div
@@ -195,8 +270,17 @@ const AllTasks = () => {
                       </div>
                     </div>
                   ) : (
-                    // Task View
                     <div className="flex items-start gap-4">
+                      {/* Checkbox */}
+                      <div className="pt-1">
+                        <input
+                          type="checkbox"
+                          checked={selectedTasks.has(task.id)}
+                          onChange={() => handleSelectTask(task.id)}
+                          className="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                        />
+                      </div>
+
                       {/* Task Content */}
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
@@ -208,6 +292,17 @@ const AllTasks = () => {
                               Important
                             </span>
                           )}
+                          {/* Source Indicator */}
+                          <span 
+                            className={`text-xs px-2 py-0.5 rounded-full ${
+                              task.id <= 150 
+                                ? 'bg-blue-100 text-blue-800' 
+                                : 'bg-green-100 text-green-800'
+                            }`}
+                            title={task.id <= 150 ? 'From DummyJSON API' : 'From Local Storage'}
+                          >
+                            {task.id <= 150 ? 'API' : 'Local'}
+                          </span>
                         </div>
                         
                         {/* Task Details */}
@@ -226,6 +321,9 @@ const AllTasks = () => {
                               {task.category.name}
                             </span>
                           )}
+                          <span className="text-xs text-gray-400">
+                            ID: {task.id}
+                          </span>
                         </div>
                       </div>
 
@@ -248,6 +346,15 @@ const AllTasks = () => {
                         >
                           {task.completed ? 'Completed' : 'Complete'}
                         </button>
+                        <button
+                          onClick={() => deleteTodo(task.id)}
+                          className="px-4 py-2 rounded-lg text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-all duration-200 flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Delete
+                        </button>
                       </div>
                     </div>
                   )}
@@ -257,7 +364,6 @@ const AllTasks = () => {
           </div>
         ))}
 
-        {/* Empty State */}
         {Object.keys(groupedTasks).length === 0 && (
           <div className="text-center py-8 text-gray-500">
             No tasks found

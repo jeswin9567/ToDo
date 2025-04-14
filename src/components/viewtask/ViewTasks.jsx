@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import useStore from '../../store/todoStore'
+import { auth } from '../../firebase/config'
 
 const ViewTasks = () => {
   const [filter, setFilter] = useState('all') // all, pending, completed
@@ -13,8 +14,29 @@ const ViewTasks = () => {
   // Get today's date in YYYY-MM-DD format
   const today = new Date().toISOString().split('T')[0]
 
+  // Filter tasks for current user (handle both API and local tasks)
+  const userTasks = todos.filter(task => {
+    // Get the numeric user ID for API tasks
+    const getDummyUserId = (firebaseUid) => {
+      const hash = firebaseUid.split('').reduce((acc, char) => {
+        return char.charCodeAt(0) + ((acc << 5) - acc);
+      }, 0);
+      return Math.abs(hash % 100) + 1;
+    };
+
+    if (!auth.currentUser) return false;
+
+    if (task.id <= 150) {
+      // API tasks - compare with mapped numeric ID
+      return task.userId === getDummyUserId(auth.currentUser.uid);
+    } else {
+      // Local tasks - compare with Firebase UID
+      return task.userId === auth.currentUser.uid;
+    }
+  });
+
   // Filter tasks for today
-  const todaysTasks = todos.filter(todo => todo.date === today)
+  const todaysTasks = userTasks.filter(todo => todo.date === today)
 
   // Apply status filter
   const filteredTasks = todaysTasks.filter(task => {

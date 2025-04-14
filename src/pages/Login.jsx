@@ -1,7 +1,12 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { GoogleLogin } from '@react-oauth/google'
+import { GoogleOAuthProvider } from '@react-oauth/google'
 import LeftPanel from '../components/LeftPanel'
+import { auth, db } from '../firebase/config'
+import { signInWithCredential, GoogleAuthProvider } from 'firebase/auth'
+import { doc, setDoc } from 'firebase/firestore'
+import { jwtDecode } from 'jwt-decode'
 
 const Login = () => {
   const navigate = useNavigate()
@@ -10,6 +15,7 @@ const Login = () => {
     password: ''
   })
   const [errors, setErrors] = useState({})
+  const [isLoading, setIsLoading] = useState(false)
 
   const validateForm = () => {
     const newErrors = {}
@@ -28,31 +34,56 @@ const Login = () => {
     e.preventDefault()
     const newErrors = validateForm()
     if (Object.keys(newErrors).length === 0) {
-      // Check if user exists in localStorage
-      const storedUser = JSON.parse(localStorage.getItem('user'))
-      if (storedUser && storedUser.email === formData.email) {
-        navigate('/todos')
-      } else {
-        setErrors({ auth: 'Invalid email or password' })
-      }
+      // Handle email/password login here
+      setErrors({ auth: 'Email/Password login not implemented yet' })
     } else {
       setErrors(newErrors)
     }
   }
 
-  const handleGoogleSuccess = (credentialResponse) => {
-    const userData = {
-      id: credentialResponse.clientId,
-      credential: credentialResponse.credential,
-      isGoogleUser: true,
-      createdAt: new Date().toISOString()
+  const handleGoogleSuccess = async (credentialResponse) => {
+    try {
+      setIsLoading(true)
+      const decoded = jwtDecode(credentialResponse.credential)
+      
+      // Create a credential for Firebase from the Google ID token
+      const credential = GoogleAuthProvider.credential(credentialResponse.credential)
+      
+      // Sign in to Firebase with the Google credential
+      const userCredential = await signInWithCredential(auth, credential)
+      
+      // Store user data in Firestore
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
+        name: decoded.name,
+        email: decoded.email,
+        uid: userCredential.user.uid,
+        lastLogin: new Date().toISOString()
+      }, { merge: true })
+
+      // Store minimal user info in localStorage for app usage
+      localStorage.setItem('user', JSON.stringify({
+        uid: userCredential.user.uid,
+        name: decoded.name,
+        email: decoded.email
+      }))
+
+      // Navigate to todos page
+      navigate('/todos')
+    } catch (error) {
+      console.error('Google sign-in error:', error)
+      setErrors({
+        auth: 'Failed to sign in with Google. Please try again.'
+      })
+    } finally {
+      setIsLoading(false)
     }
-    localStorage.setItem('user', JSON.stringify(userData))
-    navigate('/todos')
   }
 
-  const handleGoogleError = () => {
-    console.log('Google Sign In was unsuccessful.')
+  const handleGoogleError = (error) => {
+    console.error('Google Sign In Error:', error)
+    setErrors({
+      auth: 'Google sign-in failed. Please try again.'
+    })
   }
 
   const handleChange = (e) => {
@@ -86,6 +117,12 @@ const Login = () => {
             </Link>
           </p>
 
+          {errors.auth && (
+            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+              {errors.auth}
+            </div>
+          )}
+
           {/* Google Sign In Button */}
           <div className="mb-6">
             <div className="relative">
@@ -98,21 +135,22 @@ const Login = () => {
             </div>
 
             <div className="mt-6 flex justify-center">
-              <GoogleLogin
-                onSuccess={handleGoogleSuccess}
-                onError={handleGoogleError}
-                useOneTap
-              />
+              <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={handleGoogleError}
+                  useOneTap={false}
+                  flow="auth-code"
+                  theme="outline"
+                  shape="rectangular"
+                  type="standard"
+                  disabled={isLoading}
+                />
+              </GoogleOAuthProvider>
             </div>
           </div>
 
           <form className="space-y-4" onSubmit={handleSubmit}>
-            {errors.auth && (
-              <div className="bg-red-50 border border-red-200 text-red-600 rounded-lg p-3 text-sm">
-                {errors.auth}
-              </div>
-            )}
-
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-slate-700">
                 Email address
@@ -149,9 +187,12 @@ const Login = () => {
 
             <button
               type="submit"
-              className="mt-6 w-full bg-[#0A0F1E] text-white py-3 px-4 rounded-lg font-medium hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-colors duration-200"
+              disabled={isLoading}
+              className={`mt-6 w-full bg-[#0A0F1E] text-white py-3 px-4 rounded-lg font-medium hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-colors duration-200 ${
+                isLoading ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
-              Sign in
+              {isLoading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
         </div>

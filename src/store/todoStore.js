@@ -1,128 +1,229 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { todoApi } from '../services/api'
+import { auth } from '../firebase/config'
 
-const todoStore = create(
-  persist(
-    (set, get) => ({
-      todos: [],
-      categories: [
-        { id: 1, name: 'Personal', color: 'bg-pink-500' },
-        { id: 2, name: 'Work', color: 'bg-blue-500' },
-        { id: 3, name: 'Shopping', color: 'bg-amber-500' },
-        { id: 4, name: 'Ideas', color: 'bg-purple-500' }
-      ],
+const STORAGE_KEY = 'todos'
+
+const getStoredTodos = () => {
+  try {
+    console.log('Loading todos from localStorage')
+    const storedTodos = localStorage.getItem(STORAGE_KEY)
+    if (!storedTodos) return []
+    return JSON.parse(storedTodos)
+  } catch (error) {
+    console.error('Error loading todos from localStorage:', error)
+    return []
+  }
+}
+
+const saveTodosToStorage = (todos) => {
+  try {
+    console.log('Saving todos to localStorage:', todos)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(todos))
+  } catch (error) {
+    console.error('Error saving todos to localStorage:', error)
+  }
+}
+
+const getStoredCategories = () => {
+  try {
+    const storedCategories = localStorage.getItem('categories')
+    return storedCategories ? JSON.parse(storedCategories) : [
+      { id: 1, name: 'Personal', color: 'bg-blue-500' },
+      { id: 2, name: 'Work', color: 'bg-amber-500' },
+      { id: 3, name: 'Shopping', color: 'bg-purple-500' },
+      { id: 4, name: 'Ideas', color: 'bg-pink-500' }
+    ]
+  } catch (error) {
+    console.error('Error reading from localStorage:', error)
+    return []
+  }
+}
+
+const useStore = create((set, get) => ({
+  todos: [],
+  categories: getStoredCategories(),
+  loading: false,
+  error: null,
+
+  // Helper function to get current user's todos
+  getUserTodos: () => {
+    const currentUserId = auth.currentUser?.uid
+    if (!currentUserId) return []
+    return get().todos.filter(todo => todo.userId === currentUserId)
+  },
+
+  initializeTodos: async () => {
+    set({ loading: true, error: null })
+    try {
+      // Load local todos first
+      const localTodos = getStoredTodos()
+      console.log('Loaded local todos:', localTodos)
       
-      addTodo: async (todo) => {
-        try {
-          // API call to add todo
-          const response = await fetch('https://dummyjson.com/todos/add', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(todo)
-          })
-          const data = await response.json()
-          
-          // Update local state regardless of API response
-          set((state) => ({
-            todos: [...state.todos, { ...todo, id: data.id || Date.now() }]
-          }))
-        } catch (error) {
-          console.error('Failed to add todo:', error)
-          // Still update local state even if API fails
-          set((state) => ({
-            todos: [...state.todos, todo]
-          }))
-        }
-      },
+      // Filter local todos for current user
+      const currentUserId = auth.currentUser?.uid
+      const userLocalTodos = currentUserId 
+        ? localTodos.filter(todo => todo.userId === currentUserId)
+        : []
+      
+      set({ todos: userLocalTodos })
 
-      updateTodo: async (updatedTodo) => {
-        try {
-          // API call to update todo
-          await fetch(`https://dummyjson.com/todos/${updatedTodo.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updatedTodo)
-          })
+      // Then try to fetch from API
+      const response = await fetch('https://dummyjson.com/todos')
+      const data = await response.json()
+      console.log('Loaded API todos:', data.todos)
 
-          // Update local state
-          set((state) => ({
-            todos: state.todos.map(todo =>
-              todo.id === updatedTodo.id ? updatedTodo : todo
-            )
-          }))
-        } catch (error) {
-          console.error('Failed to update todo:', error)
-          // Still update local state even if API fails
-          set((state) => ({
-            todos: state.todos.map(todo =>
-              todo.id === updatedTodo.id ? updatedTodo : todo
-            )
-          }))
-        }
-      },
-
-      toggleTodo: async (id) => {
-        try {
-          const state = get()
-          const todo = state.todos.find(t => t.id === id)
-          if (!todo) return
-
-          // API call to update todo
-          await fetch(`https://dummyjson.com/todos/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ completed: !todo.completed })
-          })
-
-          // Update local state
-          set((state) => ({
-            todos: state.todos.map(t =>
-              t.id === id ? { ...t, completed: !t.completed } : t
-            )
-          }))
-        } catch (error) {
-          console.error('Failed to toggle todo:', error)
-          // Still update local state even if API fails
-          set((state) => ({
-            todos: state.todos.map(t =>
-              t.id === id ? { ...t, completed: !t.completed } : t
-            )
-          }))
-        }
-      },
-
-      deleteTodo: async (id) => {
-        try {
-          // API call to delete todo
-          await fetch(`https://dummyjson.com/todos/${id}`, {
-            method: 'DELETE'
-          })
-
-          // Update local state
-          set((state) => ({
-            todos: state.todos.filter(todo => todo.id !== id)
-          }))
-        } catch (error) {
-          console.error('Failed to delete todo:', error)
-          // Still update local state even if API fails
-          set((state) => ({
-            todos: state.todos.filter(todo => todo.id !== id)
-          }))
-        }
-      },
-
-      addCategory: (category) => {
-        set((state) => ({
-          categories: [...state.categories, category]
+      // Only merge API todos that belong to the current user
+      const apiTodos = data.todos
+        .filter(todo => todo.userId.toString() === currentUserId)
+        .map(todo => ({
+          ...todo,
+          userId: todo.userId.toString()
         }))
-      },
 
-      getCategories: () => get().categories,
-    }),
-    {
-      name: 'todo-storage', // localStorage key
+      const mergedTodos = [...userLocalTodos]
+      apiTodos.forEach(apiTodo => {
+        if (!mergedTodos.some(localTodo => localTodo.id === apiTodo.id)) {
+          mergedTodos.push(apiTodo)
+        }
+      })
+
+      console.log('Final merged todos for user:', mergedTodos)
+      set({ todos: mergedTodos })
+      saveTodosToStorage(mergedTodos)
+    } catch (error) {
+      console.error('Error initializing todos:', error)
+      set({ error: 'Failed to load todos' })
+    } finally {
+      set({ loading: false })
     }
-  )
-)
+  },
 
-export default todoStore 
+  addTodo: async (newTodo) => {
+    const currentUserId = auth.currentUser?.uid
+    if (!currentUserId) {
+      set({ error: 'Must be logged in to add todos' })
+      return
+    }
+
+    try {
+      const currentTodos = get().todos
+      const todoWithUser = {
+        ...newTodo,
+        userId: currentUserId
+      }
+
+      // Update local state and storage first
+      const updatedTodos = [...currentTodos, todoWithUser]
+      set({ todos: updatedTodos })
+      saveTodosToStorage(updatedTodos)
+
+      // Then try to sync with API
+      try {
+        const response = await fetch('https://dummyjson.com/todos/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            todo: todoWithUser.title,
+            completed: todoWithUser.completed,
+            userId: parseInt(currentUserId) || 1
+          })
+        })
+        const data = await response.json()
+        console.log('Todo added to API:', data)
+      } catch (apiError) {
+        console.error('Failed to sync todo with API:', apiError)
+      }
+    } catch (error) {
+      console.error('Error adding todo:', error)
+      set({ error: 'Failed to add todo' })
+    }
+  },
+
+  updateTodo: (id, updates) => {
+    const currentUserId = auth.currentUser?.uid
+    if (!currentUserId) return
+
+    try {
+      const currentTodos = get().todos
+      const todoToUpdate = currentTodos.find(todo => todo.id === id)
+      
+      // Only update if the todo belongs to the current user
+      if (todoToUpdate?.userId !== currentUserId) return
+
+      const updatedTodos = currentTodos.map(todo =>
+        todo.id === id ? { ...todo, ...updates } : todo
+      )
+      set({ todos: updatedTodos })
+      saveTodosToStorage(updatedTodos)
+    } catch (error) {
+      console.error('Error updating todo:', error)
+      set({ error: 'Failed to update todo' })
+    }
+  },
+
+  deleteTodo: (id) => {
+    const currentUserId = auth.currentUser?.uid
+    if (!currentUserId) return
+
+    try {
+      const currentTodos = get().todos
+      const todoToDelete = currentTodos.find(todo => todo.id === id)
+      
+      // Only delete if the todo belongs to the current user
+      if (todoToDelete?.userId !== currentUserId) return
+
+      const updatedTodos = currentTodos.filter(todo => todo.id !== id)
+      set({ todos: updatedTodos })
+      saveTodosToStorage(updatedTodos)
+    } catch (error) {
+      console.error('Error deleting todo:', error)
+      set({ error: 'Failed to delete todo' })
+    }
+  },
+
+  toggleTodo: (id) => {
+    const currentUserId = auth.currentUser?.uid
+    if (!currentUserId) return
+
+    try {
+      const currentTodos = get().todos
+      const todoToToggle = currentTodos.find(todo => todo.id === id)
+      
+      // Only toggle if the todo belongs to the current user
+      if (todoToToggle?.userId !== currentUserId) return
+
+      const updatedTodos = currentTodos.map(todo =>
+        todo.id === id ? { ...todo, completed: !todo.completed } : todo
+      )
+      set({ todos: updatedTodos })
+      saveTodosToStorage(updatedTodos)
+    } catch (error) {
+      console.error('Error toggling todo:', error)
+      set({ error: 'Failed to toggle todo' })
+    }
+  },
+
+  // Category management
+  addCategory: (newCategory) => {
+    const updatedCategories = [...get().categories, newCategory]
+    set({ categories: updatedCategories })
+    localStorage.setItem('categories', JSON.stringify(updatedCategories))
+  },
+
+  updateCategory: (updatedCategory) => {
+    const updatedCategories = get().categories.map(category =>
+      category.id === updatedCategory.id ? updatedCategory : category
+    )
+    set({ categories: updatedCategories })
+    localStorage.setItem('categories', JSON.stringify(updatedCategories))
+  },
+
+  deleteCategory: (id) => {
+    const updatedCategories = get().categories.filter(category => category.id !== id)
+    set({ categories: updatedCategories })
+    localStorage.setItem('categories', JSON.stringify(updatedCategories))
+  }
+}))
+
+export default useStore 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import useStore from '../../store/todoStore'
 import Toast from '../Toast'
+import { auth } from '../../firebase/config'
 
 const AddNewTask = () => {
   const [showCategoryInput, setShowCategoryInput] = useState(false)
@@ -12,6 +13,7 @@ const AddNewTask = () => {
   const [isImportant, setIsImportant] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [showToast, setShowToast] = useState(false)
+  const [error, setError] = useState(null)
   
   // Separate store selectors to prevent unnecessary re-renders
   const categories = useStore(state => state.categories)
@@ -27,6 +29,16 @@ const AddNewTask = () => {
       return () => clearTimeout(timer)
     }
   }, [showToast])
+
+  // Auto-hide error after 3 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        setError(null)
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [error])
 
   const handleAddCategory = (e) => {
     e.preventDefault()
@@ -51,12 +63,54 @@ const AddNewTask = () => {
     setShowTaskForm(true)
   }
 
+  // Helper function to get a consistent numeric ID for DummyJSON API
+  const getDummyUserId = (firebaseUid) => {
+    // Generate a number between 1-100 based on the firebase UID
+    // This ensures the same Firebase user always gets the same dummy ID
+    const hash = firebaseUid.split('').reduce((acc, char) => {
+      return char.charCodeAt(0) + ((acc << 5) - acc);
+    }, 0);
+    return Math.abs(hash % 100) + 1; // Returns 1-100
+  }
+
+  const addTaskToApi = async (task) => {
+    try {
+      const dummyUserId = getDummyUserId(task.userId);
+      
+      const response = await fetch('https://dummyjson.com/todos/add', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          todo: task.title,
+          completed: false,
+          userId: dummyUserId // Use mapped numeric ID for DummyJSON API
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.log('API Error Response:', errorData);
+        throw new Error(`Failed to add task to API: ${errorData.message || 'Unknown error'}`);
+      }
+
+      const data = await response.json();
+      console.log('API Success Response:', data);
+      return data;
+    } catch (error) {
+      console.error('API Error:', error);
+      throw error;
+    }
+  }
+
   const handleSubmitTask = async (e) => {
     e.preventDefault()
-    if (!taskTitle.trim()) return
+    if (!taskTitle.trim() || !auth.currentUser) return
 
     const newTask = {
       id: Date.now(),
+      userId: auth.currentUser.uid,
       title: taskTitle.trim(),
       date: taskDate,
       time: taskTime,
@@ -67,9 +121,20 @@ const AddNewTask = () => {
     }
 
     try {
+      // First, save to local storage through store
       await addTodo(newTask)
+      console.log('Task saved to local storage:', newTask)
+
+      // Then try to sync with API
+      try {
+        const apiResponse = await addTaskToApi(newTask)
+        console.log('Task synced with API:', apiResponse)
+      } catch (apiError) {
+        console.error('API sync failed, but task is saved locally:', apiError)
+        setError('Task saved locally, but failed to sync with server')
+      }
       
-      // Reset form
+      // Reset form regardless of API success
       setTaskTitle('')
       setTaskDate('')
       setTaskTime('')
@@ -80,7 +145,8 @@ const AddNewTask = () => {
       // Show success toast
       setShowToast(true)
     } catch (error) {
-      console.error('Failed to add task:', error)
+      console.error('Failed to save task:', error)
+      setError('Failed to save task. Please try again.')
     }
   }
 
@@ -90,6 +156,12 @@ const AddNewTask = () => {
   return (
     <>
       <div className="mt-6 space-y-4">
+        {error && (
+          <div className="p-4 bg-amber-100 text-amber-700 rounded-lg">
+            {error}
+          </div>
+        )}
+        
         {/* Add Task Button */}
         <button
           onClick={handleAddTaskClick}

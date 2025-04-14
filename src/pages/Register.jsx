@@ -1,7 +1,12 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { GoogleLogin } from '@react-oauth/google'
+import { GoogleOAuthProvider } from '@react-oauth/google'
 import LeftPanel from '../components/LeftPanel'
+import { auth, db } from '../firebase/config'
+import { createUserWithEmailAndPassword, signInWithCredential, GoogleAuthProvider, updateProfile } from 'firebase/auth'
+import { doc, setDoc } from 'firebase/firestore'
+import { jwtDecode } from 'jwt-decode'
 
 const Register = () => {
   const navigate = useNavigate()
@@ -14,6 +19,7 @@ const Register = () => {
   const [errors, setErrors] = useState({})
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   const validateName = (name) => {
     // Only allow alphabets and spaces, and spaces must be between alphabets
@@ -47,36 +53,91 @@ const Register = () => {
     return newErrors
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     const newErrors = validateForm()
+    
     if (Object.keys(newErrors).length === 0) {
-      const userData = {
-        name: formData.name,
-        email: formData.email,
-        id: Date.now(),
-        createdAt: new Date().toISOString()
+      setIsLoading(true)
+      try {
+        // Create user with email and password
+        const userCredential = await createUserWithEmailAndPassword(
+          auth,
+          formData.email,
+          formData.password
+        )
+
+        // Update user profile with name
+        await updateProfile(userCredential.user, {
+          displayName: formData.name
+        })
+
+        // Store additional user data in Firestore
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+          name: formData.name,
+          email: formData.email,
+          createdAt: new Date().toISOString(),
+          authProvider: 'email',
+          lastLogin: new Date().toISOString()
+        })
+
+        // Clear form and navigate to login
+        setFormData({
+          name: '',
+          email: '',
+          password: '',
+          confirmPassword: ''
+        })
+        navigate('/login')
+      } catch (error) {
+        console.error('Registration error:', error)
+        setErrors({
+          submit: error.code === 'auth/email-already-in-use' 
+            ? 'Email already exists. Please use a different email or try logging in.'
+            : error.message || 'Failed to create account. Please try again.'
+        })
+      } finally {
+        setIsLoading(false)
       }
-      localStorage.setItem('user', JSON.stringify(userData))
-      navigate('/login')
     } else {
       setErrors(newErrors)
     }
   }
 
-  const handleGoogleSuccess = (credentialResponse) => {
-    const userData = {
-      id: credentialResponse.clientId,
-      credential: credentialResponse.credential,
-      isGoogleUser: true,
-      createdAt: new Date().toISOString()
+  const handleGoogleSuccess = async (credentialResponse) => {
+    try {
+      setIsLoading(true)
+      const decoded = jwtDecode(credentialResponse.credential)
+      
+      // Create a credential for Firebase from the Google ID token
+      const credential = GoogleAuthProvider.credential(credentialResponse.credential)
+      
+      // Sign in to Firebase with the Google credential
+      const userCredential = await signInWithCredential(auth, credential)
+      
+      // Store only essential user data in Firestore
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
+        name: decoded.name,
+        email: decoded.email,
+        uid: userCredential.user.uid
+      }, { merge: true })
+
+      navigate('/todos')
+    } catch (error) {
+      console.error('Google sign-in error:', error)
+      setErrors({
+        submit: 'Failed to register with Google. Please try again.'
+      })
+    } finally {
+      setIsLoading(false)
     }
-    localStorage.setItem('user', JSON.stringify(userData))
-    navigate('/todos')
   }
 
-  const handleGoogleError = () => {
-    console.log('Google Sign In was unsuccessful.')
+  const handleGoogleError = (error) => {
+    console.error('Google Sign In Error:', error)
+    setErrors({
+      submit: 'Google sign-in failed. Please try again or use email registration.'
+    })
   }
 
   const handleChange = (e) => {
@@ -135,6 +196,12 @@ const Register = () => {
             </Link>
           </p>
 
+          {errors.submit && (
+            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+              {errors.submit}
+            </div>
+          )}
+
           {/* Google Sign In Button */}
           <div className="mb-6">
             <div className="relative">
@@ -147,11 +214,18 @@ const Register = () => {
             </div>
 
             <div className="mt-6 flex justify-center">
-              <GoogleLogin
-                onSuccess={handleGoogleSuccess}
-                onError={handleGoogleError}
-                useOneTap
-              />
+              <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={handleGoogleError}
+                  useOneTap={false}
+                  flow="auth-code"
+                  theme="outline"
+                  shape="rectangular"
+                  type="standard"
+                  disabled={isLoading}
+                />
+              </GoogleOAuthProvider>
             </div>
           </div>
 
@@ -270,9 +344,12 @@ const Register = () => {
 
             <button
               type="submit"
-              className="mt-6 w-full bg-[#0A0F1E] text-white py-3 px-4 rounded-lg font-medium hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-colors duration-200"
+              disabled={isLoading}
+              className={`mt-6 w-full bg-[#0A0F1E] text-white py-3 px-4 rounded-lg font-medium hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-colors duration-200 ${
+                isLoading ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
-              Create Account
+              {isLoading ? 'Creating Account...' : 'Create Account'}
             </button>
           </form>
         </div>

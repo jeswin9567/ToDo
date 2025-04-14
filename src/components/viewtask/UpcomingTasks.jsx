@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import useStore from '../../store/todoStore'
+import { auth } from '../../firebase/config'
 
 const UpcomingTasks = () => {
   const [filter, setFilter] = useState('all') // all, pending, completed
@@ -19,8 +20,29 @@ const UpcomingTasks = () => {
   const todayStr = today.toISOString().split('T')[0]
   const nextThreeDaysStr = nextThreeDays.toISOString().split('T')[0]
 
+  // Filter tasks for current user
+  const userTasks = todos.filter(task => {
+    // Get the numeric user ID for API tasks
+    const getDummyUserId = (firebaseUid) => {
+      const hash = firebaseUid.split('').reduce((acc, char) => {
+        return char.charCodeAt(0) + ((acc << 5) - acc);
+      }, 0);
+      return Math.abs(hash % 100) + 1;
+    };
+
+    if (!auth.currentUser) return false;
+
+    if (task.id <= 150) {
+      // API tasks - compare with mapped numeric ID
+      return task.userId === getDummyUserId(auth.currentUser.uid);
+    } else {
+      // Local tasks - compare with Firebase UID
+      return task.userId === auth.currentUser.uid;
+    }
+  });
+
   // Filter upcoming tasks (next 3 days)
-  const upcomingTasks = todos.filter(todo => {
+  const upcomingTasks = userTasks.filter(todo => {
     const taskDate = new Date(todo.date)
     return taskDate >= today && taskDate <= nextThreeDays
   })

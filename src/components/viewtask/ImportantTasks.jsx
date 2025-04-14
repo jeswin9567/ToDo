@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import useStore from '../../store/todoStore'
+import { auth } from '../../firebase/config'
 
 const ImportantTasks = () => {
   const [filter, setFilter] = useState('all') // all, pending, completed
@@ -10,8 +11,29 @@ const ImportantTasks = () => {
   const updateTodo = useStore(state => state.updateTodo)
   const deleteTodo = useStore(state => state.deleteTodo)
 
+  // Filter tasks for current user
+  const userTasks = todos.filter(task => {
+    // Get the numeric user ID for API tasks
+    const getDummyUserId = (firebaseUid) => {
+      const hash = firebaseUid.split('').reduce((acc, char) => {
+        return char.charCodeAt(0) + ((acc << 5) - acc);
+      }, 0);
+      return Math.abs(hash % 100) + 1;
+    };
+
+    if (!auth.currentUser) return false;
+
+    if (task.id <= 150) {
+      // API tasks - compare with mapped numeric ID
+      return task.userId === getDummyUserId(auth.currentUser.uid);
+    } else {
+      // Local tasks - compare with Firebase UID
+      return task.userId === auth.currentUser.uid;
+    }
+  });
+
   // Filter important tasks
-  const importantTasks = todos.filter(todo => todo.isImportant)
+  const importantTasks = userTasks.filter(todo => todo.isImportant)
 
   // Apply status filter
   const filteredTasks = importantTasks.filter(task => {
