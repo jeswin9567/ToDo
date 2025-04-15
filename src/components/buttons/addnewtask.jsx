@@ -63,10 +63,8 @@ const AddNewTask = () => {
     setShowTaskForm(true)
   }
 
-  // Helper function to get a consistent numeric ID for DummyJSON API
-  const getDummyUserId = (firebaseUid) => {
-    // Generate a number between 1-100 based on the firebase UID
-    // This ensures the same Firebase user always gets the same dummy ID
+  // Helper function to convert Firebase UID to a number between 1-100
+  const getNumericUserId = (firebaseUid) => {
     const hash = firebaseUid.split('').reduce((acc, char) => {
       return char.charCodeAt(0) + ((acc << 5) - acc);
     }, 0);
@@ -75,7 +73,8 @@ const AddNewTask = () => {
 
   const addTaskToApi = async (task) => {
     try {
-      const dummyUserId = getDummyUserId(task.userId);
+      // Convert Firebase UID to numeric ID for DummyJSON API
+      const numericUserId = getNumericUserId(task.userId);
       
       const response = await fetch('https://dummyjson.com/todos/add', {
         method: 'POST',
@@ -85,7 +84,7 @@ const AddNewTask = () => {
         body: JSON.stringify({
           todo: task.title,
           completed: false,
-          userId: dummyUserId // Use mapped numeric ID for DummyJSON API
+          userId: numericUserId // Use numeric ID for API
         })
       });
 
@@ -106,11 +105,22 @@ const AddNewTask = () => {
 
   const handleSubmitTask = async (e) => {
     e.preventDefault()
-    if (!taskTitle.trim() || !auth.currentUser) return
+    
+    // Check if user is logged in
+    if (!auth.currentUser) {
+      setError('Please log in to add tasks')
+      return
+    }
+
+    // Check if task title is provided
+    if (!taskTitle.trim()) {
+      setError('Task title is required')
+      return
+    }
 
     const newTask = {
       id: Date.now(),
-      userId: auth.currentUser.uid,
+      userId: auth.currentUser.uid, // Keep Firebase UID for local storage
       title: taskTitle.trim(),
       date: taskDate,
       time: taskTime,
@@ -131,10 +141,11 @@ const AddNewTask = () => {
         console.log('Task synced with API:', apiResponse)
       } catch (apiError) {
         console.error('API sync failed, but task is saved locally:', apiError)
-        setError('Task saved locally, but failed to sync with server')
+        // Don't show error to user since local save was successful
+        console.log('Task saved locally successfully')
       }
       
-      // Reset form regardless of API success
+      // Reset form
       setTaskTitle('')
       setTaskDate('')
       setTaskTime('')

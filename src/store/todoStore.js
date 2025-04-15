@@ -2,12 +2,12 @@ import { create } from 'zustand'
 import { todoApi } from '../services/api'
 import { auth } from '../firebase/config'
 
-const STORAGE_KEY = 'todos'
+const STORAGE_KEY_PREFIX = 'todos_'
 
-const getStoredTodos = () => {
+const getStoredTodos = (userId) => {
   try {
-    console.log('Loading todos from localStorage')
-    const storedTodos = localStorage.getItem(STORAGE_KEY)
+    console.log('Loading todos for user:', userId)
+    const storedTodos = localStorage.getItem(`${STORAGE_KEY_PREFIX}${userId}`)
     if (!storedTodos) return []
     return JSON.parse(storedTodos)
   } catch (error) {
@@ -16,10 +16,10 @@ const getStoredTodos = () => {
   }
 }
 
-const saveTodosToStorage = (todos) => {
+const saveTodosToStorage = (userId, todos) => {
   try {
-    console.log('Saving todos to localStorage:', todos)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(todos))
+    console.log('Saving todos for user:', userId)
+    localStorage.setItem(`${STORAGE_KEY_PREFIX}${userId}`, JSON.stringify(todos))
   } catch (error) {
     console.error('Error saving todos to localStorage:', error)
   }
@@ -56,17 +56,17 @@ const useStore = create((set, get) => ({
   initializeTodos: async () => {
     set({ loading: true, error: null })
     try {
-      // Load local todos first
-      const localTodos = getStoredTodos()
-      console.log('Loaded local todos:', localTodos)
-      
-      // Filter local todos for current user
       const currentUserId = auth.currentUser?.uid
-      const userLocalTodos = currentUserId 
-        ? localTodos.filter(todo => todo.userId === currentUserId)
-        : []
-      
-      set({ todos: userLocalTodos })
+      if (!currentUserId) {
+        console.log('No user logged in')
+        set({ todos: [] })
+        return
+      }
+
+      // Load local todos for current user
+      const localTodos = getStoredTodos(currentUserId)
+      console.log('Loaded local todos:', localTodos)
+      set({ todos: localTodos })
 
       // Then try to fetch from API
       const response = await fetch('https://dummyjson.com/todos')
@@ -81,7 +81,7 @@ const useStore = create((set, get) => ({
           userId: todo.userId.toString()
         }))
 
-      const mergedTodos = [...userLocalTodos]
+      const mergedTodos = [...localTodos]
       apiTodos.forEach(apiTodo => {
         if (!mergedTodos.some(localTodo => localTodo.id === apiTodo.id)) {
           mergedTodos.push(apiTodo)
@@ -90,7 +90,7 @@ const useStore = create((set, get) => ({
 
       console.log('Final merged todos for user:', mergedTodos)
       set({ todos: mergedTodos })
-      saveTodosToStorage(mergedTodos)
+      saveTodosToStorage(currentUserId, mergedTodos)
     } catch (error) {
       console.error('Error initializing todos:', error)
       set({ error: 'Failed to load todos' })
@@ -113,10 +113,10 @@ const useStore = create((set, get) => ({
         userId: currentUserId
       }
 
-      // Update local state and storage first
+      // Update local state and storage
       const updatedTodos = [...currentTodos, todoWithUser]
       set({ todos: updatedTodos })
-      saveTodosToStorage(updatedTodos)
+      saveTodosToStorage(currentUserId, updatedTodos)
 
       // Then try to sync with API
       try {
@@ -125,7 +125,7 @@ const useStore = create((set, get) => ({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             todo: todoWithUser.title,
-            completed: todoWithUser.completed,
+            completed: false,
             userId: parseInt(currentUserId) || 1
           })
         })
@@ -155,7 +155,7 @@ const useStore = create((set, get) => ({
         todo.id === id ? { ...todo, ...updates } : todo
       )
       set({ todos: updatedTodos })
-      saveTodosToStorage(updatedTodos)
+      saveTodosToStorage(currentUserId, updatedTodos)
     } catch (error) {
       console.error('Error updating todo:', error)
       set({ error: 'Failed to update todo' })
@@ -175,7 +175,7 @@ const useStore = create((set, get) => ({
 
       const updatedTodos = currentTodos.filter(todo => todo.id !== id)
       set({ todos: updatedTodos })
-      saveTodosToStorage(updatedTodos)
+      saveTodosToStorage(currentUserId, updatedTodos)
     } catch (error) {
       console.error('Error deleting todo:', error)
       set({ error: 'Failed to delete todo' })
@@ -197,7 +197,7 @@ const useStore = create((set, get) => ({
         todo.id === id ? { ...todo, completed: !todo.completed } : todo
       )
       set({ todos: updatedTodos })
-      saveTodosToStorage(updatedTodos)
+      saveTodosToStorage(currentUserId, updatedTodos)
     } catch (error) {
       console.error('Error toggling todo:', error)
       set({ error: 'Failed to toggle todo' })

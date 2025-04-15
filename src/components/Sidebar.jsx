@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import useStore from '../store/todoStore';
 import { auth } from '../firebase/config';
+import { signOut } from 'firebase/auth';
 
 const Sidebar = ({ setActiveTab, setSelectedCategory }) => {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [userData, setUserData] = useState(null);
   const location = useLocation();
+  const navigate = useNavigate();
   const todos = useStore(state => state.todos);
   const categories = useStore(state => state.categories); // Get categories from store
+  const deleteCategory = useStore(state => state.deleteCategory);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -60,6 +63,19 @@ const Sidebar = ({ setActiveTab, setSelectedCategory }) => {
   const upcomingTasksCount = userTodos.filter(todo => todo.date > today).length;
   const allTasksCount = userTodos.length;
 
+  const handleSignOut = async () => {
+    try {
+      // Sign out from Firebase
+      await signOut(auth);
+      // Only remove user data from localStorage, keep todos
+      localStorage.removeItem('user');
+      // Navigate to login page
+      navigate('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
   const tasks = [
     { name: 'All Tasks', onClick: () => setActiveTab('all'), icon: '📋', count: allTasksCount },
     { name: 'Today', onClick: () => setActiveTab('today'), icon: '📅', count: todaysTasksCount },
@@ -67,12 +83,9 @@ const Sidebar = ({ setActiveTab, setSelectedCategory }) => {
     { name: 'Upcoming', onClick: () => setActiveTab('upcoming'), icon: '📆', count: upcomingTasksCount },
     { 
       name: 'Sign Out', 
-      onClick: () => {
-        localStorage.removeItem('user');
-        window.location.href = '/login';
-      }, 
+      onClick: handleSignOut,
       icon: '👋',
-      isSignOut: true // Special flag for styling
+      isSignOut: true
     }
   ];
 
@@ -81,6 +94,14 @@ const Sidebar = ({ setActiveTab, setSelectedCategory }) => {
     ...category,
     count: userTodos.filter(todo => todo.category?.id === category.id).length
   }));
+
+  const handleDeleteCategory = (categoryId, e) => {
+    e.stopPropagation(); // Prevent triggering the category selection
+    deleteCategory(categoryId);
+    // If the deleted category was selected, reset to all tasks
+    setActiveTab('all');
+    setSelectedCategory(null);
+  };
 
   return (
     <div className="w-72 min-h-screen bg-[#FAF9F6] flex flex-col border-r border-gray-200">
@@ -160,22 +181,33 @@ const Sidebar = ({ setActiveTab, setSelectedCategory }) => {
         <h3 className="text-xs font-semibold text-gray-400 tracking-wider uppercase ml-2 mb-2">Lists</h3>
         <div className="space-y-1">
           {categoryTaskCounts.map((category) => (
-            <button
+            <div
               key={category.id}
+              className="flex items-center justify-between w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 rounded-xl transition-all duration-200 border group cursor-pointer"
               onClick={() => {
                 setActiveTab('category');
                 setSelectedCategory(category);
               }}
-              className="flex items-center justify-between w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 rounded-xl transition-all duration-200 border"
             >
               <div className="flex items-center space-x-3">
                 <span className={`w-2 h-2 rounded-full ${category.color}`}></span>
                 <span>{category.name}</span>
               </div>
-              <span className="px-2 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-600">
-                {category.count}
-              </span>
-            </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={(e) => handleDeleteCategory(category.id, e)}
+                  className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                  title="Delete list"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </button>
+                <span className="px-2 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-600">
+                  {category.count}
+                </span>
+              </div>
+            </div>
           ))}
 
           {/* Add New List Button */}
