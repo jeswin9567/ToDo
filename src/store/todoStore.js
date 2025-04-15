@@ -3,6 +3,7 @@ import { todoApi } from '../services/api'
 import { auth } from '../firebase/config'
 
 const STORAGE_KEY_PREFIX = 'todos_'
+const REMINDERS_KEY = 'reminders'
 
 const getStoredTodos = (userId) => {
   try {
@@ -40,11 +41,30 @@ const getStoredCategories = () => {
   }
 }
 
+const getStoredReminders = () => {
+  try {
+    const storedReminders = localStorage.getItem(REMINDERS_KEY)
+    return storedReminders ? JSON.parse(storedReminders) : {}
+  } catch (error) {
+    console.error('Error loading reminders from localStorage:', error)
+    return {}
+  }
+}
+
+const saveRemindersToStorage = (reminders) => {
+  try {
+    localStorage.setItem(REMINDERS_KEY, JSON.stringify(reminders))
+  } catch (error) {
+    console.error('Error saving reminders to localStorage:', error)
+  }
+}
+
 const useStore = create((set, get) => ({
   todos: [],
   categories: getStoredCategories(),
   loading: false,
   error: null,
+  reminders: getStoredReminders(),
 
   // Helper function to get current user's todos
   getUserTodos: () => {
@@ -118,6 +138,11 @@ const useStore = create((set, get) => ({
       set({ todos: updatedTodos })
       saveTodosToStorage(currentUserId, updatedTodos)
 
+      // Set reminder if specified
+      if (newTodo.reminderTime) {
+        get().setReminder(todoWithUser.id, newTodo.reminderTime)
+      }
+
       // Then try to sync with API
       try {
         const response = await fetch('https://dummyjson.com/todos/add', {
@@ -176,6 +201,9 @@ const useStore = create((set, get) => ({
       const updatedTodos = currentTodos.filter(todo => todo.id !== id)
       set({ todos: updatedTodos })
       saveTodosToStorage(currentUserId, updatedTodos)
+
+      // Remove any associated reminder
+      get().removeReminder(id)
     } catch (error) {
       console.error('Error deleting todo:', error)
       set({ error: 'Failed to delete todo' })
@@ -223,6 +251,59 @@ const useStore = create((set, get) => ({
     const updatedCategories = get().categories.filter(category => category.id !== id)
     set({ categories: updatedCategories })
     localStorage.setItem('categories', JSON.stringify(updatedCategories))
+  },
+
+  setReminder: (todoId, reminderTime) => {
+    const currentUserId = auth.currentUser?.uid
+    if (!currentUserId) return
+
+    try {
+      const currentReminders = get().reminders
+      const updatedReminders = {
+        ...currentReminders,
+        [todoId]: {
+          time: reminderTime,
+          userId: currentUserId
+        }
+      }
+      set({ reminders: updatedReminders })
+      saveRemindersToStorage(updatedReminders)
+
+      // Schedule notification
+      const todo = get().todos.find(t => t.id === todoId)
+      if (todo && reminderTime) {
+        const reminderDate = new Date(reminderTime)
+        const now = new Date()
+        
+        if (reminderDate > now) {
+          const timeUntilReminder = reminderDate.getTime() - now.getTime()
+          setTimeout(() => {
+            if (Notification.permission === "granted") {
+              new Notification("Todo Reminder", {
+                body: `Reminder for task: ${todo.title}`,
+                icon: "/favicon.ico"
+              })
+            }
+          }, timeUntilReminder)
+        }
+      }
+    } catch (error) {
+      console.error('Error setting reminder:', error)
+    }
+  },
+
+  removeReminder: (todoId) => {
+    const currentUserId = auth.currentUser?.uid
+    if (!currentUserId) return
+
+    try {
+      const currentReminders = get().reminders
+      const { [todoId]: removed, ...updatedReminders } = currentReminders
+      set({ reminders: updatedReminders })
+      saveRemindersToStorage(updatedReminders)
+    } catch (error) {
+      console.error('Error removing reminder:', error)
+    }
   }
 }))
 

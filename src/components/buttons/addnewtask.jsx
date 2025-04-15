@@ -14,6 +14,8 @@ const AddNewTask = () => {
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [showToast, setShowToast] = useState(false)
   const [error, setError] = useState(null)
+  const [reminderTime, setReminderTime] = useState('')
+  const [showReminderInput, setShowReminderInput] = useState(false)
   
   // Separate store selectors to prevent unnecessary re-renders
   const categories = useStore(state => state.categories)
@@ -118,12 +120,22 @@ const AddNewTask = () => {
       return
     }
 
+    // Request notification permission if reminder is set
+    if (reminderTime && Notification.permission === "default") {
+      const permission = await Notification.requestPermission()
+      if (permission !== "granted") {
+        setError('Notification permission is required for reminders')
+        return
+      }
+    }
+
     const newTask = {
       id: Date.now(),
-      userId: auth.currentUser.uid, // Keep Firebase UID for local storage
+      userId: auth.currentUser.uid,
       title: taskTitle.trim(),
       date: taskDate,
       time: taskTime,
+      reminderTime: reminderTime || null,
       isImportant,
       category: selectedCategory,
       completed: false,
@@ -141,17 +153,17 @@ const AddNewTask = () => {
         console.log('Task synced with API:', apiResponse)
       } catch (apiError) {
         console.error('API sync failed, but task is saved locally:', apiError)
-        // Don't show error to user since local save was successful
-        console.log('Task saved locally successfully')
       }
       
       // Reset form
       setTaskTitle('')
       setTaskDate('')
       setTaskTime('')
+      setReminderTime('')
       setIsImportant(false)
       setSelectedCategory(null)
       setShowTaskForm(false)
+      setShowReminderInput(false)
       
       // Show success toast
       setShowToast(true)
@@ -254,6 +266,38 @@ const AddNewTask = () => {
                   <span className="ml-3 text-sm font-medium text-gray-700">Important</span>
                 </label>
               </div>
+
+              {/* Reminder Toggle */}
+              <div className="flex items-center space-x-3 pt-6">
+                <label htmlFor="showReminder" className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    id="showReminder"
+                    checked={showReminderInput}
+                    onChange={(e) => setShowReminderInput(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                  <span className="ml-3 text-sm font-medium text-gray-700">Set Reminder</span>
+                </label>
+              </div>
+
+              {/* Reminder Input */}
+              {showReminderInput && (
+                <div className="w-full sm:w-auto">
+                  <label htmlFor="reminderTime" className="block text-sm font-medium text-gray-700 mb-1">
+                    Reminder Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    id="reminderTime"
+                    value={reminderTime}
+                    onChange={(e) => setReminderTime(e.target.value)}
+                    min={new Date().toISOString().slice(0, 16)}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 bg-white text-gray-900"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Categories Section */}
