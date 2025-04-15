@@ -104,20 +104,20 @@ const Sidebar = ({ setActiveTab, setSelectedCategory }) => {
   };
 
   return (
-    <div className="w-72 min-h-screen bg-[#FAF9F6] flex flex-col border-r border-gray-200">
+    <div className="w-full sm:w-72 min-h-screen bg-[#FAF9F6] flex flex-col border-r border-gray-200">
       {/* User Profile Section */}
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 flex items-center justify-center shadow-lg">
-            <span className="text-white font-semibold text-lg">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 flex items-center justify-center shadow-lg">
+            <span className="text-white font-semibold text-base sm:text-lg">
               {userData?.name ? userData.name[0].toUpperCase() : 'U'}
             </span>
           </div>
           <div>
-            <h2 className="text-base font-semibold text-gray-900">
+            <h2 className="text-sm sm:text-base font-semibold text-gray-900">
               {userData?.name || 'User'}
             </h2>
-            <p className="text-sm text-gray-500">
+            <p className="text-xs sm:text-sm text-gray-500">
               {userData?.email || 'user@example.com'}
             </p>
           </div>
@@ -125,14 +125,14 @@ const Sidebar = ({ setActiveTab, setSelectedCategory }) => {
 
         {/* Search Bar */}
         <div
-          className={`mt-6 relative transition-all duration-200 ${
+          className={`mt-4 sm:mt-6 relative transition-all duration-200 ${
             isSearchFocused ? 'scale-105' : ''
           }`}
         >
           <input
             type="text"
             placeholder="Search tasks..."
-            className="w-full px-4 py-2 rounded-xl bg-gray-50 border border-gray-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none transition-all duration-200"
+            className="w-full px-3 sm:px-4 py-2 text-sm rounded-xl bg-gray-50 border border-gray-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none transition-all duration-200"
             onFocus={() => setIsSearchFocused(true)}
             onBlur={() => setIsSearchFocused(false)}
           />
@@ -141,7 +141,7 @@ const Sidebar = ({ setActiveTab, setSelectedCategory }) => {
       </div>
 
       {/* Tasks Section */}
-      <div className="px-4 py-2">
+      <div className="px-3 sm:px-4 py-2">
         <h3 className="text-xs font-semibold text-gray-400 tracking-wider uppercase ml-2 mb-2">Tasks</h3>
         <nav className="space-y-1">
           {tasks.map((task) => (
@@ -151,7 +151,7 @@ const Sidebar = ({ setActiveTab, setSelectedCategory }) => {
                 task.onClick();
                 setSelectedCategory(null); // Reset category filter when clicking main tasks
               }}
-              className={`flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-xl transition-all duration-200 
+              className={`flex items-center justify-between w-full px-3 sm:px-4 py-2 text-sm font-medium rounded-xl transition-all duration-200 
                 ${task.isSignOut 
                   ? 'text-red-600 hover:bg-red-50 mt-4' 
                   : location.pathname === '/dashboard' && task.name === 'All Tasks'
@@ -159,8 +159,8 @@ const Sidebar = ({ setActiveTab, setSelectedCategory }) => {
                     : 'text-gray-700 hover:bg-gray-50'}`}
             >
               <div className="flex items-center space-x-3">
-                <span className="text-xl">{task.icon}</span>
-                <span>{task.name}</span>
+                <span className="text-lg sm:text-xl">{task.icon}</span>
+                <span className="text-sm">{task.name}</span>
               </div>
               {!task.isSignOut && task.count > 0 && (
                 <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
@@ -177,13 +177,29 @@ const Sidebar = ({ setActiveTab, setSelectedCategory }) => {
       </div>
 
       {/* Lists Section */}
-      <div className="px-4 py-2 flex-1">
-        <h3 className="text-xs font-semibold text-gray-400 tracking-wider uppercase ml-2 mb-2">Lists</h3>
+      <div className="px-3 sm:px-4 py-2 flex-1">
+        <div className="flex items-center justify-between ml-2 mb-2">
+          <h3 className="text-xs font-semibold text-gray-400 tracking-wider uppercase">Lists</h3>
+          <button
+            onClick={() => {
+              setActiveTab('all');
+              setSelectedCategory(null);
+            }}
+            className="text-xs text-amber-600 hover:text-amber-700 font-medium"
+          >
+            + Add New
+          </button>
+        </div>
+
+        {/* Categories List */}
         <div className="space-y-1">
           {categoryTaskCounts.map((category) => (
             <div
               key={category.id}
-              className="flex items-center justify-between w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 rounded-xl transition-all duration-200 border group cursor-pointer"
+              className={`group flex items-center justify-between w-full px-3 sm:px-4 py-2 text-sm font-medium rounded-xl transition-all duration-200 cursor-pointer
+                ${setSelectedCategory?.id === category.id
+                  ? 'bg-gray-100'
+                  : 'hover:bg-gray-50'}`}
               onClick={() => {
                 setActiveTab('category');
                 setSelectedCategory(category);
@@ -191,36 +207,22 @@ const Sidebar = ({ setActiveTab, setSelectedCategory }) => {
             >
               <div className="flex items-center space-x-3">
                 <span className={`w-2 h-2 rounded-full ${category.color}`}></span>
-                <span>{category.name}</span>
+                <span className="text-gray-700">{category.name}</span>
               </div>
               <div className="flex items-center space-x-2">
+                <span className="text-xs text-gray-500">{category.count}</span>
                 <button
                   onClick={(e) => handleDeleteCategory(category.id, e)}
-                  className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                  className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-600 transition-opacity duration-200"
                   title="Delete list"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                 </button>
-                <span className="px-2 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-600">
-                  {category.count}
-                </span>
               </div>
             </div>
           ))}
-
-          {/* Add New List Button */}
-          <button 
-            onClick={() => {
-              setActiveTab('all');
-              setSelectedCategory(null);
-            }}
-            className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-amber-600 hover:text-amber-500 w-full bg-white hover:bg-gray-50 rounded-xl transition-all duration-200 border"
-          >
-            <span className="text-xl">+</span>
-            <span>Add New List</span>
-          </button>
         </div>
       </div>
     </div>

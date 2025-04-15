@@ -69,10 +69,10 @@ const ImportantTasks = () => {
   return (
     <div className="mt-8">
       {/* Filter Buttons */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4">
         <button
           onClick={() => setFilter('all')}
-          className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 
+          className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 
             ${filter === 'all' 
               ? 'bg-[#1a1a1a] text-white' 
               : 'bg-white text-gray-600 hover:bg-gray-50'}`}
@@ -81,7 +81,7 @@ const ImportantTasks = () => {
         </button>
         <button
           onClick={() => setFilter('pending')}
-          className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 
+          className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 
             ${filter === 'pending' 
               ? 'bg-[#1a1a1a] text-white' 
               : 'bg-white text-gray-600 hover:bg-gray-50'}`}
@@ -90,7 +90,7 @@ const ImportantTasks = () => {
         </button>
         <button
           onClick={() => setFilter('completed')}
-          className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 
+          className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 
             ${filter === 'completed' 
               ? 'bg-[#1a1a1a] text-white' 
               : 'bg-white text-gray-600 hover:bg-gray-50'}`}
@@ -109,7 +109,7 @@ const ImportantTasks = () => {
           sortedTasks.map(task => (
             <div
               key={task.id}
-              className={`bg-white rounded-lg border p-4 transition-all duration-200 hover:shadow-md
+              className={`bg-white rounded-lg border p-3 sm:p-4 transition-all duration-200 hover:shadow-md
                 ${task.completed ? 'border-gray-200' : 'border-gray-300'}`}
             >
               {editingTask?.id === task.id ? (
@@ -120,37 +120,28 @@ const ImportantTasks = () => {
                       type="text"
                       value={editingTask.title}
                       onChange={(e) => setEditingTask({...editingTask, title: e.target.value})}
-                      className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
                       placeholder="Task title"
                     />
                   </div>
                   <div className="flex flex-wrap gap-4">
-                    <div className="flex flex-col space-y-1">
+                    <div className="w-full sm:w-auto">
                       <input
                         type="date"
                         value={editingTask.date}
                         onChange={(e) => setEditingTask({...editingTask, date: e.target.value})}
                         min={new Date().toISOString().split('T')[0]}
-                        className="px-3 py-1 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
                       />
                     </div>
-                    <div className="flex flex-col space-y-1">
+                    <div className="w-full sm:w-auto">
                       <input
                         type="time"
                         value={editingTask.time}
                         onChange={(e) => setEditingTask({...editingTask, time: e.target.value})}
-                        className="px-3 py-1 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
                       />
                     </div>
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={editingTask.isImportant}
-                        onChange={(e) => setEditingTask({...editingTask, isImportant: e.target.checked})}
-                        className="rounded text-amber-500 focus:ring-amber-500"
-                      />
-                      <span className="text-sm text-gray-700">Important</span>
-                    </label>
                   </div>
 
                   {/* Category Selection */}
@@ -162,7 +153,7 @@ const ImportantTasks = () => {
                           key={category.id}
                           type="button"
                           onClick={() => setEditingTask({...editingTask, category})}
-                          className={`px-3 py-1 rounded-full border text-sm font-medium transition-colors duration-200 flex items-center space-x-2 
+                          className={`flex-1 sm:flex-none px-3 py-1 rounded-full border text-sm font-medium transition-colors duration-200 flex items-center justify-center space-x-2 
                             ${editingTask.category?.id === category.id 
                               ? 'bg-gray-100 border-gray-400' 
                               : 'bg-white border-gray-200 hover:bg-gray-50'}`}
@@ -174,29 +165,27 @@ const ImportantTasks = () => {
                     </div>
                   </div>
 
-                  <div className="flex justify-end space-x-2">
+                  <div className="flex flex-wrap items-center gap-4">
                     <button
-                      type="button"
-                      onClick={() => setEditingTask(null)}
-                      className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors duration-200"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
                       onClick={handleSaveEdit}
-                      className="px-4 py-2 text-sm font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 transition-colors duration-200"
+                      className="flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors duration-200"
                     >
                       Save Changes
+                    </button>
+                    <button
+                      onClick={() => setEditingTask(null)}
+                      className="flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors duration-200"
+                    >
+                      Cancel
                     </button>
                   </div>
                 </div>
               ) : (
                 // Task View
-                <div className="flex items-start gap-4">
+                <div className="flex flex-col sm:flex-row items-start gap-4">
                   {/* Task Content */}
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                  <div className="flex-1 w-full">
+                    <div className="flex flex-wrap items-start gap-2">
                       <h3 className={`font-medium ${task.completed ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
                         {task.title}
                       </h3>
@@ -206,7 +195,7 @@ const ImportantTasks = () => {
                     </div>
                     
                     {/* Task Details */}
-                    <div className="mt-1 flex items-center gap-3 text-sm text-gray-500">
+                    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs sm:text-sm text-gray-500">
                       {task.time && (
                         <span className="flex items-center gap-1">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -225,18 +214,18 @@ const ImportantTasks = () => {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto mt-3 sm:mt-0">
                     {!task.completed && (
                       <button
                         onClick={() => handleEdit(task)}
-                        className="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all duration-200"
+                        className="flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all duration-200"
                       >
                         Edit
                       </button>
                     )}
                     <button
                       onClick={() => handleComplete(task.id)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 
+                      className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 
                         ${task.completed 
                           ? 'bg-green-100 text-green-700 hover:bg-green-200' 
                           : 'bg-[#1a1a1a] text-white hover:bg-[#252525]'}`}
@@ -245,7 +234,7 @@ const ImportantTasks = () => {
                     </button>
                     <button
                       onClick={() => deleteTodo(task.id)}
-                      className="px-4 py-2 rounded-lg text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-all duration-200"
+                      className="flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-all duration-200"
                     >
                       Delete
                     </button>

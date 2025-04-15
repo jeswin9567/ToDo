@@ -37,23 +37,23 @@ const CategoryTasks = ({ selectedCategory }) => {
         {getCategoryTasks().map(task => (
           <div
             key={task.id}
-            className={`bg-white rounded-lg border p-4 transition-all duration-200 hover:shadow-md
+            className={`bg-white rounded-lg border p-3 sm:p-4 transition-all duration-200 hover:shadow-md
               ${task.completed ? 'border-gray-200' : 'border-gray-300'}`}
           >
-            <div className="flex items-start justify-between">
-              <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+              <div className="space-y-1 sm:space-y-0">
                 <h3 className={`font-medium ${task.completed ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
                   {task.title}
                 </h3>
                 {task.date && (
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="text-xs sm:text-sm text-gray-500 mt-1">
                     Due: {new Date(task.date).toLocaleDateString()}
                     {task.time && ` at ${task.time}`}
                   </p>
                 )}
               </div>
               {task.isImportant && (
-                <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full">
+                <span className="inline-flex sm:self-start bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full">
                   Important
                 </span>
               )}

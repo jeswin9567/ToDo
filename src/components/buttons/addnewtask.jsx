@@ -176,21 +176,24 @@ const AddNewTask = () => {
         {/* Add Task Button */}
         <button
           onClick={handleAddTaskClick}
-          className="flex items-center space-x-2 px-4 py-2 bg-white text-gray-800 border border-gray-200 rounded-lg hover:bg-gray-100 transition-all duration-200 shadow-sm"
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 transition-colors duration-200"
+          data-add-task-button
+          aria-label="Add New Task (Ctrl/Cmd + N)"
         >
-          <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            className="h-5 w-5" 
-            viewBox="0 0 20 20" 
-            fill="currentColor"
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
           >
-            <path 
-              fillRule="evenodd" 
-              d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" 
-              clipRule="evenodd" 
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 4v16m8-8H4"
             />
           </svg>
-          <span>Add New Task</span>
+          Add New Task
         </button>
 
         {/* Task Form */}
